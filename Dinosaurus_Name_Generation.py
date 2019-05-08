@@ -1,3 +1,7 @@
+#Basic RNN Cell.
+#One Layer.
+#Python
+
 #Import Dependencies
 import numpy as np
 from utils import *
@@ -82,9 +86,79 @@ def sample(parameters, char_to_ix, seed):
 
 np.random.seed(2)
 _, n_a = 20, 100
+Wax, Waa, Wya, b, by = np.random.randn(n_a, vocab_size), np.random.randn(n_a, n_a), np.random.randn(vocab_size, n_a), np.random.randn(n_a, 1), np.random.randn(vocab_size, 1)
+parameters = {"Wax": Wax, "Waa": Waa, "Wya": Wya, "b": b, "by": by}
+
+indices = sample(parameters, char_to_ix, 0)
+print("Sampling:")
+print("list of sampled indices:", indices)
+print("list of sampled characters:", [ix_to_char[i] for i in indices])
+
+def optimize(X, Y, a_prev, parameters, learning_rate = 0.01):
+  loss, cache = rnn_forward(X, Y, a_prev, parameters)
+  gradients, a = rnn_backward(X, Y, parameters, cache)
+  gradients = clip(gradients, 5)
+  parameters = update_parameters(parameters, gradients, learning_rate)
+  
+  return loss, gradients, a[len(X) - 1]
+
+np.random.seed(1)
+vocab_size, n_a = 27, 100
+a_prev = np.random.randn(n_a, 1)
+Wax, Waa, Wya, b, by = np.random.randn(n_a, vocab_size), np.random.randn(n_a, n_a), np.random.randn(vocab_size, n_a), np.random.randn(n_a, 1), np.random.randn(vocab_size, 1)
+parameters = {"Wax": Wax, "Waa": Waa, "Wya": Wya, "b": b, "by": by}
+X = [12,3,5,11,22,3]
+Y = [4,14,11,22,25, 26]
+
+loss, gradients, a_last = optimize(X, Y, a_prev, parameters, learning_rate = 0.01)
+print("Loss =", loss)
+print("gradients[\"dWaa\"][1][2] =", gradients["dWaa"][1][2])
+print("np.argmax(gradients[\"dWax\"]) =", np.argmax(gradients["dWax"]))
+print("gradients[\"dWya\"][1][2] =", gradients["dWya"][1][2])
+print("gradients[\"db\"][4] =", gradients["db"][4])
+print("gradients[\"dby\"][1] =", gradients["dby"][1])
+print("a_last[4] =", a_last[4])
+
+#Training the Model
+def model(data, ix_to_char, char_to_ix, num_iterations = 35000, n_a = 50, dino_names = 7, vocab_size = 27):
+  n_x, n_y = vocab_size, vocab_size
+  parameters = initialize_parameters(n_a, n_x, n_y)
+  loss = get_initial_loss(vocab_size, dino_names)   #To Smooth the loss
+  
+  with open("dinos.txt") as f:
+    examples = f.readlines()
+  examples = [x.lower().strip() for x in examples]
+  
+  np.random.seed(0)
+  np.random.shuffle(examples)
+  
+  a_prev = np.zeros((n_a, 1))
+  
+  for j in range(num_iterations):
+    index = j % len(examples)
+    X = [None] + [char_to_ix[ch] for ch in examples[index]]
+    Y = X[1:] + [char_to_ix["\n"]]
+    
+    curr_loss, gradients, a_prev = optimize(X, Y, a_prev, parameters)
+    
+    loss = smooth(loss, curr_loss)  #Latency trick to keep the loss smooth in order to accelerate training.
+    
+    if j % 2000 == 0:
+      print('Iteration: %d, Loss: %f' % (j, loss) + '\n')
+      
+      seed = 0
+      for name in range(dino_names):
+        sampled_indices = sample(parameters, char_to_ix, seed)
+        print_sample(sampled_indices, ix_to_char)
+        
+        seed += 1
+      print('\n')
+  return parameters
+
+parameters = model(data, ix_to_char, char_to_ix)
 
 
-
+    
 
 
 
